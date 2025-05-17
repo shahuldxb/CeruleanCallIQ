@@ -1,0 +1,22 @@
+# .gitignore
+# Virtual environment
+venv/
+env/
+# Python cache files
+__pycache__/
+*.py[cod]
+# Log files
+*.log
+# Environment configuration
+.env
+# Model files
+*.pkl
+*.h5
+# Temporary files
+temp/
+# Uploaded files
+uploads/
+# Excel files (if they contain output data)
+*.xlsx
+# JSON files (if they contain output data)
+*.json
