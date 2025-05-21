@@ -1,11 +1,13 @@
 from flask import Flask, jsonify, send_from_directory, request, Response
 from flask_cors import CORS
-import os, json, hashlib
+import os, hashlib, datetime, pyodbc
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from DeepTranscript import analyze_audio_with_deepgram
-from audio import process_audio_file
+from audio import process_audio_file  # whisper
+# from aws_audio import process_audio_with_aws
+# from azure_audio import process_audio_with_azure
 import requests
 
 UPLOAD_FOLDER = "uploads"
@@ -20,6 +22,8 @@ class AudioServerApp:
         self.CONTAINER_NAME = os.getenv("CONTAINER_NAME")
         self.UPLOAD_FOLDER = os.path.abspath(UPLOAD_FOLDER)
         self.LOCAL_FOLDER_PATH = os.getenv("LOCAL_FOLDER_PATH")
+        self.DB_CONN_STR = os.getenv("DB_CONN_STR")  # ODBC connection string in .env
+
         self.setup_routes()
 
     def setup_routes(self):
@@ -27,14 +31,13 @@ class AudioServerApp:
         self.app.route("/azure-audio/<path:filename>", methods=["GET"])(self.get_azure_audio)
         self.app.route("/api/local-files", methods=["GET"])(self.get_local_files)
         self.app.route("/api/azure-files", methods=["GET"])(self.get_azure_files)
-        # self.app.route("/process-audio", methods=["POST"])(self.upload_audio_files)
         self.app.route("/api/process-audio", methods=["POST"])(self.process_audio_stream)
 
     def serve_audio(self, filename):
         try:
-            upload_path = os.path.join(self.UPLOAD_FOLDER, filename)
+            upload_path = os.path.join(UPLOAD_FOLDER, filename)
             if os.path.exists(upload_path):
-                return send_from_directory(self.UPLOAD_FOLDER, filename)
+                return send_from_directory(UPLOAD_FOLDER, filename)
 
             local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
             if os.path.exists(local_path):
@@ -128,7 +131,15 @@ class AudioServerApp:
             print("Error in transcription:", str(e))
             return jsonify({"error": str(e)}), 500
 
+    
     def run_model(self, model, filepath):
+        filename = os.path.basename(filepath)
+        
+        model_name = model.lower() if model else "azure"  # default model name
+        
+        # Set entity_id to 1 by default
+        entity_id = 1
+        
         if model == "deepgram":
             try:
                 NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels"
@@ -144,18 +155,62 @@ class AudioServerApp:
                 audio_url = f"{public_url}/audio/{filename}"
                 print(f"🔍 Sending this AUDIO_URL to Deepgram: {audio_url}")
 
-                return analyze_audio_with_deepgram(audio_url)
+                result = analyze_audio_with_deepgram(audio_url)
+
+                # ⬇️ Process and insert into DB
+                transcription = result["transcription"]
+                hash_value = hashlib.sha256(transcription.encode()).hexdigest()
+
+                # ✅ INSERT into DB
+                self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
+                print("✅ Deepgram transcription inserted into DB.")
+
+                return result
+
             except Exception as e:
                 print("Deepgram ngrok URL error:", str(e))
                 raise
-        elif model == "whisper":
-            return process_audio_file(filepath)
-        elif model == "aws":
-            return process_audio_with_aws(filepath)
-        elif model == "azure":
-            return process_audio_with_azure(filepath)
+
+            
+        elif model_name == "whisper":
+            result = process_audio_file(filepath)
+            
+        elif model_name == "aws":
+            result = process_audio_with_aws(filepath)
+            
+        elif model_name == "azure":
+            result = process_audio_with_azure(filepath)
+            
         else:
             raise ValueError("Invalid model selected")
+
+        transcription = result["transcription"]
+        hash_value = hashlib.sha256(transcription.encode()).hexdigest()
+
+        # Now insert transcription with entity_id and also model_name
+        self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
+
+        return result
+
+    def insert_transcription_to_db(self, entity_id, model_name, filename, hash_value, transcription_text):
+        try:
+            conn = pyodbc.connect(self.DB_CONN_STR)
+            cursor = conn.cursor()
+            created_at = datetime.datetime.now()
+            updated_at = created_at
+
+            # Adjust your stored procedure or query if you want to save model_name as well.
+            # For now, I assume your stored procedure only accepts entity_id and other fields.
+            cursor.execute("""
+                EXEC InsertTranscriptionResult ?, ?, ?, ?, ?, ?, ?
+""", (entity_id, model_name, filename, hash_value, transcription_text, created_at, updated_at))
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print("Database insertion error:", str(e))
+
 
     def run(self, port=5000, debug=True):
         self.app.run(port=port, debug=debug)
@@ -163,4 +218,3 @@ class AudioServerApp:
 if __name__ == "__main__":
     server = AudioServerApp()
     server.run()
-
