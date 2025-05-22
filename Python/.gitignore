@@ -6,3 +6,8 @@ env/
 *.log
 # Environment configuration
 .env
+uploads/
+app.log
+frontend.log
+__pycache__/
+*.pyc
