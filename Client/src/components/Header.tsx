@@ -1,4 +1,7 @@
+import { useNavigate } from "react-router-dom";
+
 function Header() {
+  const navigate = useNavigate();
   return (
     <header
       className="header fixed top-0 z-10 left-0 right-0 flex items-stretch shrink-0 bg-[#fefefe] dark:bg-coal-500"
@@ -1039,14 +1042,19 @@ function Header() {
                   data-menu-item-toggle="accordion|lg:dropdown"
                   data-menu-item-trigger="click|lg:hover"
                 >
-                  <div className="menu-link text-sm text-gray-700 font-medium menu-link-hover:text-primary menu-item-active:text-gray-900 menu-item-show:text-primary menu-item-here:text-gray-900 menu-item-active:font-semibold menu-item-here:font-semibold">
-                    <span className="menu-title text-nowrap">Network</span>
+                  <div
+                    className="menu-link text-sm text-gray-700 font-medium menu-link-hover:text-primary menu-item-active:text-gray-900 menu-item-show:text-primary menu-item-here:text-gray-900 menu-item-active:font-semibold menu-item-here:font-semibold cursor-pointer"
+                    onClick={() => navigate("/transcription")}
+                  >
+                    <span className="menu-title text-nowrap">
+                      Transcription Hub
+                    </span>
                     <span className="menu-arrow flex lg:hidden">
                       <i className="ki-filled ki-plus text-2xs menu-item-show:hidden"></i>
                       <i className="ki-filled ki-minus text-2xs hidden menu-item-show:inline-flex"></i>
                     </span>
                   </div>
-                  <div className="menu-dropdown flex-col gap-0 w-full lg:max-w-[670px]">
+                  {/* <div className="menu-dropdown flex-col gap-0 w-full lg:max-w-[670px]">
                     <div className="flex flex-col lg:flex-row">
                       <div className="flex flex-col gap-5 lg:w-[250px] mt-2 lg:mt-0 lg:border-r lg:border-r-gray-200 rounded-xl lg:rounded-none lg:rounded-tl-xl shrink-0 px-3 py-4 lg:p-7.5 bg-light-active dark:bg-coal-500 dark:lg:border-r-coal-100">
                         <h3 className="text-sm text-gray-800 font-semibold leading-none pl-2.5 h-3.5">
@@ -1276,7 +1284,7 @@ function Header() {
                         Read Documentation
                       </a>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
                 <div
                   className="menu-item"

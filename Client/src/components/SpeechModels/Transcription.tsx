@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import TranscriptionResult from "./TranscriptionResult";
 import { logFrontend } from "../../utils/Logger";
+import { FaSpinner } from "react-icons/fa";
 interface FileItem {
   file: string;
   isAzure: boolean;
@@ -20,6 +21,8 @@ const Transcription: React.FC = () => {
   >([]);
 
   const [outboxFiles, setOutboxFiles] = useState<string[]>([]);
+  const [processingFile, setProcessingFile] = useState<string | null>(null);
+
   const options = [
     { label: "azure", value: "1" },
     { label: "localFolder", value: "2" },
@@ -114,6 +117,7 @@ const Transcription: React.FC = () => {
 
       if (isBrowse) {
         for (const fileObj of files) {
+          setProcessingFile(fileObj.file);
           if (!fileObj.rawFile) continue;
 
           const formData = new FormData();
@@ -140,9 +144,11 @@ const Transcription: React.FC = () => {
           setFiles(remainingFiles); // update inbox immediately
           setTranscriptionResults((prev) => [...prev, ...resultArray]);
         }
+        setProcessingFile(null);
       } else {
         // Handle other options: one file at a time
         for (const fileObj of files) {
+          setProcessingFile(fileObj.file);
           const response = await axios.post(
             "http://localhost:5000/api/process-audio",
             {
@@ -175,18 +181,21 @@ const Transcription: React.FC = () => {
       });
       alert("An error occurred during processing.");
     }
+    setProcessingFile(null);
   };
 
   return (
     <div className="card p-4 ">
       <div className="flex items-center gap-4 flex-wrap pb-2">
-        <h1 className=" text-md whitespace-nowrap">Select Folder :</h1>
+        <h1 className="dark:text-gray-800 text-sm whitespace-nowrap">
+          Select Folder :
+        </h1>
 
         {options.map((Option) => (
           <>
             <div className="flex items-center gap-2" key={Option.value}>
               <input
-                className="checkbox"
+                className="checkbox  checkbox-sm"
                 id={`check-${Option.value}`}
                 type="checkbox"
                 checked={selectOption === Option.value}
@@ -224,11 +233,13 @@ const Transcription: React.FC = () => {
         />
       </div>
       <div className="flex items-center gap-4 flex-wrap pb-2">
-        <h1 className="text-md whitespace-nowrap ">Select Model :</h1>
+        <h1 className=" dark:text-gray-800 text-sm whitespace-nowrap ">
+          Select Model :
+        </h1>
         {Modeloptions.map((Option) => (
           <div className="flex items-center gap-2" key={Option.value}>
             <input
-              className="checkbox"
+              className="checkbox  checkbox-sm"
               id={`check-${Option.value}`}
               type="checkbox"
               checked={selectModelOption === Option.value}
@@ -259,9 +270,13 @@ const Transcription: React.FC = () => {
                       key={idx}
                       className="flex items-center justify-between gap-2 border-b pb-3 pt-3"
                     >
-                      <div className="flex-1 text-left">
+                      <div className="flex-1 text-left flex items-center gap-2">
                         {idx}: {file}
+                        {processingFile === file && (
+                          <FaSpinner className="animate-spin text-gray-500 ml-2" />
+                        )}
                       </div>
+
                       <div
                         className="cursor-pointer"
                         onClick={() => togglePlayPause(idx)}
@@ -318,7 +333,7 @@ const Transcription: React.FC = () => {
                         ref={(el) => (audioRefs.current[idx] = el)}
                         src={`http://localhost:5000/${
                           isAzure ? "azure-audio" : "audio"
-                        }/${file}`}
+                        }/${encodeURIComponent(file)}`}
                         onEnded={() => setPlayingIndex(null)}
                         onError={() => console.error(`Error loading ${file}`)}
                       />
@@ -343,7 +358,9 @@ const Transcription: React.FC = () => {
         </>
       ) : (
         <div className="mt-6 scrollable scrollbar-hide h-[550px]">
-          <h2 className="text-lg font-semibold mb-4">Transcription Result</h2>
+          <h2 className="text-lg font-semibold mb-4 dark:text-gray-800">
+            Transcription Result
+          </h2>
           <TranscriptionResult results={transcriptionResults} />
         </div>
       )}

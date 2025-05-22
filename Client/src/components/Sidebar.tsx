@@ -1,4 +1,6 @@
+import { useNavigate } from "react-router-dom";
 function Sidebar() {
+  const navigate = useNavigate();
   return <div
   className="sidebar dark:bg-coal-600 bg-light border-r border-r-gray-200 dark:border-r-coal-100 fixed top-0 bottom-0 z-20 hidden lg:flex flex-col items-stretch shrink-0"
   data-drawer="true"
@@ -103,6 +105,20 @@ function Sidebar() {
                 </span>
               </a>
             </div>
+          </div>
+        </div>
+        <div className="menu-item">
+          <div
+            className="menu-label gap-[10px] pl-[10px] pr-[10px] py-[6px] border border-transparent"
+            tabIndex={0}
+            onClick={() => navigate("/transcription")}
+          >
+            <span className="menu-icon items-start w-[20px] text-gray-500 dark:text-gray-400">
+              <i className="ki-filled ki-note-2 text-lg"></i>
+            </span>
+            <span className="menu-title text-sm font-semibold text-gray-700">
+              Transcription Hub
+            </span>
           </div>
         </div>
         <div className="menu-item pt-2.25 pb-px">
@@ -1658,22 +1674,6 @@ function Sidebar() {
             </span>
             <span className="menu-title text-sm font-semibold text-gray-700">
               Modals
-            </span>
-            <span className="menu-badge mr-[-10px]">
-              <span className="badge badge-xs">Soon</span>
-            </span>
-          </div>
-        </div>
-        <div className="menu-item">
-          <div
-            className="menu-label gap-[10px] pl-[10px] pr-[10px] py-[6px] border border-transparent"
-            tabIndex={0}
-          >
-            <span className="menu-icon items-start w-[20px] text-gray-500 dark:text-gray-400">
-              <i className="ki-filled ki-note-2 text-lg"></i>
-            </span>
-            <span className="menu-title text-sm font-semibold text-gray-700">
-              Wizards
             </span>
             <span className="menu-badge mr-[-10px]">
               <span className="badge badge-xs">Soon</span>

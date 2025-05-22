@@ -46,21 +46,40 @@ class AudioServerApp:
         self.app.route("/api/azure-files", methods=["GET"])(self.get_azure_files)
         self.app.route("/api/process-audio", methods=["POST"])(self.process_audio_stream)
         self.app.route("/api/log", methods=["POST"])(self.log_from_frontend)
+    # def serve_audio(self, filename):
+    #     try:
+    #         upload_path = os.path.join(UPLOAD_FOLDER, filename)
+    #         if os.path.exists(upload_path):
+    #             return send_from_directory(UPLOAD_FOLDER, filename)
+
+    #         local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
+    #         if os.path.exists(local_path):
+    #             return send_from_directory(self.LOCAL_FOLDER_PATH, filename)
+
+    #         raise FileNotFoundError(f"File not found: {filename}")
+    #     except Exception as e:
+    #         logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
+    #         return jsonify({"error": str(e)}), 404
     def serve_audio(self, filename):
         try:
-            upload_path = os.path.join(UPLOAD_FOLDER, filename)
-            if os.path.exists(upload_path):
-                return send_from_directory(UPLOAD_FOLDER, filename)
+            # Check upload folder first
+            upload_path = os.path.join(self.UPLOAD_FOLDER, filename)
+            if os.path.isfile(upload_path):
+                return send_from_directory(self.UPLOAD_FOLDER, filename)
 
+            # Check local folder as fallback
             local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
-            if os.path.exists(local_path):
+            if os.path.isfile(local_path):
                 return send_from_directory(self.LOCAL_FOLDER_PATH, filename)
 
-            raise FileNotFoundError(f"File not found: {filename}")
+            # If not found in either path
+            error_msg = f"File not found in upload or local folder: {filename}"
+            logging.warning(error_msg)
+            return jsonify({"error": error_msg}), 404
+
         except Exception as e:
             logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
-            return jsonify({"error": str(e)}), 404
-
+            return jsonify({"error": "Internal server error"}), 500
     def get_azure_audio(self, filename):
         try:
             blob_service_client = BlobServiceClient.from_connection_string(self.AZURE_CONNECTION_STRING)
