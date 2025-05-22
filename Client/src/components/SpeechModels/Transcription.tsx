@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import TranscriptionResult from "./TranscriptionResult";
+import { logFrontend } from "../../utils/Logger";
+interface FileItem {
+  file: string;
+  isAzure: boolean;
+  rawFile?: File;
+}
 
 const Transcription: React.FC = () => {
   const [selectOption, setSelectOption] = useState<string>("");
   const [selectModelOption, setSelectModelOption] = useState<string>("");
-  const [files, setFiles] = useState<{ file: string; isAzure: boolean }[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const [showResult, setShowResult] = useState(false);
@@ -13,10 +19,7 @@ const Transcription: React.FC = () => {
     { filename: string; transcription: string }[]
   >([]);
 
-  const [outboxFiles, setOutboxFiles] = useState<
-    { file: string; isAzure: boolean }[]
-  >([]);
-
+  const [outboxFiles, setOutboxFiles] = useState<string[]>([]);
   const options = [
     { label: "azure", value: "1" },
     { label: "localFolder", value: "2" },
@@ -60,7 +63,6 @@ const Transcription: React.FC = () => {
     fetchFiles();
   }, [selectOption]);
 
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
     if (selectedFiles) {
@@ -96,81 +98,14 @@ const Transcription: React.FC = () => {
     console.log("Updated transcriptionResults:", transcriptionResults);
   }, [transcriptionResults]);
 
-  //   const handleProcess = async () => {
-  //   if (!selectModelOption || files.length === 0) {
-  //     alert("Please select a model and at least one file.");
-  //     return;
-  //   }
-
-  //   const isBrowse = selectOption === "4";
-
-  //   try {
-  //     let remainingFiles = [...files];
-  //     const allResults = [];
-
-  //     if (isBrowse) {
-  //   const formData = new FormData();
-  //   formData.append("model", selectModelOption);
-
-  //   for (const fileObj of files) {
-  //     if (fileObj.rawFile) {
-  //       formData.append("files", fileObj.rawFile);  // ✅ Send the File object itself
-  //     }
-  //   }
-
-  //   const response = await axios.post(
-  //     "http://localhost:5000/api/process-audio",
-  //     formData,
-  //     {
-  //       headers: { "Content-Type": "multipart/form-data" },
-  //     }
-  //   );
-
-  //   const resultArray = response.data;
-  //   if (Array.isArray(resultArray)) {
-  //     allResults.push(...resultArray);
-  //   }
-
-  //   for (const fileObj of files) {
-  //     setOutboxFiles((prev) => [...prev, fileObj.file]);
-  //     remainingFiles = remainingFiles.filter((f) => f.file !== fileObj.file);
-  //   }
-  // }
-  //  else {
-  //       // Handle other options: one file at a time
-  //       for (const fileObj of files) {
-  //         const response = await axios.post(
-  //           "http://localhost:5000/api/process-audio",
-  //           {
-  //             model: selectModelOption,
-  //             files: [fileObj.file],
-  //             isAzure: selectOption === "1",
-  //           }
-  //         );
-
-  //         const resultArray = response.data;
-  //         if (Array.isArray(resultArray)) {
-  //           allResults.push(...resultArray);
-  //         }
-
-  //         setOutboxFiles((prev) => [...prev, fileObj.file]);
-  //         remainingFiles = remainingFiles.filter((f) => f.file !== fileObj.file);
-  //       }
-  //     }
-
-  //     setFiles(remainingFiles);
-  //     setTranscriptionResults((prev) => [...prev, ...allResults]);
-  //   } catch (err) {
-  //     console.error("Error processing audio:", err);
-  //     alert("An error occurred during processing.");
-  //   }
-  // };
   const handleProcess = async () => {
     if (!selectModelOption || files.length === 0) {
       alert("Please select a model and at least one file.");
       return;
     }
-
+    logFrontend("info", "user clicked the process button", {
+      page: "transcription page",
+    });
     const isBrowse = selectOption === "4";
 
     try {
@@ -178,7 +113,6 @@ const Transcription: React.FC = () => {
       const allResults = [];
 
       if (isBrowse) {
-        // 🔁 Process each browsed file individually
         for (const fileObj of files) {
           if (!fileObj.rawFile) continue;
 
@@ -233,34 +167,43 @@ const Transcription: React.FC = () => {
       }
     } catch (err) {
       console.error("Error processing audio:", err);
+      logFrontend("error", "Error processing audio", {
+        error: err instanceof Error ? err.message : String(err),
+        model: selectModelOption,
+        source: selectOption,
+        page: "transcription page",
+      });
       alert("An error occurred during processing.");
     }
   };
 
   return (
     <div className="card p-4 ">
-      <h1 className="form-label pb-2 text-md">Select audio Folder</h1>
       <div className="flex items-center gap-4 flex-wrap pb-2">
+        <h1 className=" text-md whitespace-nowrap">Select Folder :</h1>
+
         {options.map((Option) => (
-          <div className="flex items-center gap-2" key={Option.value}>
-            <input
-              className="checkbox"
-              id={`check-${Option.value}`}
-              type="checkbox"
-              checked={selectOption === Option.value}
-              onChange={() =>
-                setSelectOption((pre) =>
-                  pre === Option.value ? "" : Option.value
-                )
-              }
-            />
-            <label
-              className="label form-label"
-              htmlFor={`check-${Option.value}`}
-            >
-              {Option.label}
-            </label>
-          </div>
+          <>
+            <div className="flex items-center gap-2" key={Option.value}>
+              <input
+                className="checkbox"
+                id={`check-${Option.value}`}
+                type="checkbox"
+                checked={selectOption === Option.value}
+                onChange={() =>
+                  setSelectOption((pre) =>
+                    pre === Option.value ? "" : Option.value
+                  )
+                }
+              />
+              <label
+                className="label form-label"
+                htmlFor={`check-${Option.value}`}
+              >
+                {Option.label}
+              </label>
+            </div>
+          </>
         ))}
         <div className="ml-auto">
           <button
@@ -280,8 +223,8 @@ const Transcription: React.FC = () => {
           onChange={handleFileSelect}
         />
       </div>
-      <h1 className="form-label pb-3 text-md">Select Model</h1>
       <div className="flex items-center gap-4 flex-wrap pb-2">
+        <h1 className="text-md whitespace-nowrap ">Select Model :</h1>
         {Modeloptions.map((Option) => (
           <div className="flex items-center gap-2" key={Option.value}>
             <input

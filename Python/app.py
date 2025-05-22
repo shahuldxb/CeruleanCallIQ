@@ -5,10 +5,23 @@ from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 from DeepTranscript import analyze_audio_with_deepgram
-from audio import process_audio_file  # whisper
-# from aws_audio import process_audio_with_aws
-# from azure_audio import process_audio_with_azure
+from audio import process_audio_file  
 import requests
+import logging
+import traceback
+# Configure logging
+logging.basicConfig(
+    filename='app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+# REMOVE THIS if not needed
+frontend_logger = logging.getLogger('frontendLogger')
+frontend_logger.setLevel(logging.INFO)
+handler = logging.FileHandler('frontend.log')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+frontend_logger.addHandler(handler)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -32,7 +45,7 @@ class AudioServerApp:
         self.app.route("/api/local-files", methods=["GET"])(self.get_local_files)
         self.app.route("/api/azure-files", methods=["GET"])(self.get_azure_files)
         self.app.route("/api/process-audio", methods=["POST"])(self.process_audio_stream)
-
+        self.app.route("/api/log", methods=["POST"])(self.log_from_frontend)
     def serve_audio(self, filename):
         try:
             upload_path = os.path.join(UPLOAD_FOLDER, filename)
@@ -45,7 +58,7 @@ class AudioServerApp:
 
             raise FileNotFoundError(f"File not found: {filename}")
         except Exception as e:
-            print(f"Error serving file '{filename}':", e)
+            logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 404
 
     def get_azure_audio(self, filename):
@@ -56,7 +69,7 @@ class AudioServerApp:
             audio_data = stream.readall()
             return Response(audio_data, mimetype="audio/mpeg")
         except Exception as e:
-            print("Error serving Azure audio:", e)
+            logging.error(f"Error serving Azure audio: {e}\n{traceback.format_exc()}")
             return Response("Audio not found", status=404)
 
     def get_local_files(self):
@@ -65,9 +78,10 @@ class AudioServerApp:
                 raise ValueError("LOCAL_FOLDER_PATH is not set or invalid.")
             files = os.listdir(self.LOCAL_FOLDER_PATH)
             audio_files = [f for f in files if f.endswith(".mp3") or f.endswith(".wav")]
+            logging.info("Fetched local audio files successfully.")
             return jsonify(audio_files)
         except Exception as e:
-            print("Error reading local files:", str(e))
+            logging.error(f"Error reading local files: {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 500
 
     def get_azure_files(self):
@@ -76,9 +90,10 @@ class AudioServerApp:
             container_client = blob_service_client.get_container_client(self.CONTAINER_NAME)
             blobs = container_client.list_blobs()
             audio_files = [blob.name for blob in blobs if blob.name.endswith(".mp3") or blob.name.endswith(".wav")]
+            logging.info("Fetched Azure audio files successfully.")
             return jsonify(audio_files)
         except Exception as e:
-            print("Error fetching Azure files:", str(e))
+            logging.error(f"Error fetching Azure files: {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 500
 
     def process_audio_stream(self):
@@ -108,7 +123,7 @@ class AudioServerApp:
                         pass
                     else:
                         raise FileNotFoundError(f"File not found: {filename}")
-
+                    logging.info(f"Processing file: {filename} with model: {model}")
                     result = self.run_model(model, filepath)
                     results.append({"filename": filename, "transcription": result["transcription"]})
                     os.remove(filepath)
@@ -121,14 +136,15 @@ class AudioServerApp:
                     filename = secure_filename(file.filename)
                     filepath = os.path.join(self.UPLOAD_FOLDER, filename)
                     file.save(filepath)
+                    logging.info(f"Uploaded file: {filename}")
 
                     result = self.run_model(model, filepath)
                     results.append({"filename": filename, "transcription": result["transcription"]})
-
+            logging.info(f"Successfully processed {len(results)} file(s).")
             return jsonify(results)
 
         except Exception as e:
-            print("Error in transcription:", str(e))
+            logging.error(f"Error in transcription: {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 500
 
     
@@ -139,58 +155,60 @@ class AudioServerApp:
         
         # Set entity_id to 1 by default
         entity_id = 1
-        
-        if model == "deepgram":
-            try:
-                NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels"
-                ngrok_response = requests.get(NGROK_API_URL).json()
-                public_url = next(
-                    (t["public_url"] for t in ngrok_response["tunnels"] if t["public_url"].startswith("https://")),
-                    None
-                )
-                if not public_url:
-                    raise Exception("No HTTPS ngrok tunnel found")
+        try:    
+            if model == "deepgram":
+                try:
+                    NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels"
+                    ngrok_response = requests.get(NGROK_API_URL).json()
+                    public_url = next(
+                        (t["public_url"] for t in ngrok_response["tunnels"] if t["public_url"].startswith("https://")),
+                        None
+                    )
+                    if not public_url:
+                        raise Exception("No HTTPS ngrok tunnel found")
 
-                filename = os.path.basename(filepath)
-                audio_url = f"{public_url}/audio/{filename}"
-                print(f"🔍 Sending this AUDIO_URL to Deepgram: {audio_url}")
+                    filename = os.path.basename(filepath)
+                    audio_url = f"{public_url}/audio/{filename}"
+                    logging.info(f"Sending audio to Deepgram: {audio_url}")
+                    result = analyze_audio_with_deepgram(audio_url)
 
-                result = analyze_audio_with_deepgram(audio_url)
+                    # ⬇️ Process and insert into DB
+                    transcription = result["transcription"]
+                    hash_value = hashlib.sha256(transcription.encode()).hexdigest()
 
-                # ⬇️ Process and insert into DB
-                transcription = result["transcription"]
-                hash_value = hashlib.sha256(transcription.encode()).hexdigest()
+                    # ✅ INSERT into DB
+                    self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
+                    print("✅ Deepgram transcription inserted into DB.")
 
-                # ✅ INSERT into DB
-                self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
-                print("✅ Deepgram transcription inserted into DB.")
+                    return result
 
-                return result
+                except Exception as e:
+                    print("Deepgram ngrok URL error:", str(e))
+                    raise
 
-            except Exception as e:
-                print("Deepgram ngrok URL error:", str(e))
-                raise
+                
+            elif model_name == "whisper":
+                result = process_audio_file(filepath)
+                
+            elif model_name == "aws":
+                result = process_audio_with_aws(filepath)
+                
+            elif model_name == "azure":
+                result = process_audio_with_azure(filepath)
+                
+            else:
+                raise ValueError("Invalid model selected")
 
-            
-        elif model_name == "whisper":
-            result = process_audio_file(filepath)
-            
-        elif model_name == "aws":
-            result = process_audio_with_aws(filepath)
-            
-        elif model_name == "azure":
-            result = process_audio_with_azure(filepath)
-            
-        else:
-            raise ValueError("Invalid model selected")
+            transcription = result["transcription"]
+            hash_value = hashlib.sha256(transcription.encode()).hexdigest()
 
-        transcription = result["transcription"]
-        hash_value = hashlib.sha256(transcription.encode()).hexdigest()
-
-        # Now insert transcription with entity_id and also model_name
-        self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
-
-        return result
+            # Now insert transcription with entity_id and also model_name
+            self.insert_transcription_to_db(entity_id, model_name, filename, hash_value, transcription)
+            logging.info(f"Inserted transcription for file: {filename} into database.")
+            return result
+        except Exception as e:
+            logging.error(f"Model processing error: {e}\n{traceback.format_exc()}")
+            raise
 
     def insert_transcription_to_db(self, entity_id, model_name, filename, hash_value, transcription_text):
         try:
@@ -198,9 +216,6 @@ class AudioServerApp:
             cursor = conn.cursor()
             created_at = datetime.datetime.now()
             updated_at = created_at
-
-            # Adjust your stored procedure or query if you want to save model_name as well.
-            # For now, I assume your stored procedure only accepts entity_id and other fields.
             cursor.execute("""
                 EXEC InsertTranscriptionResult ?, ?, ?, ?, ?, ?, ?
 """, (entity_id, model_name, filename, hash_value, transcription_text, created_at, updated_at))
@@ -208,10 +223,28 @@ class AudioServerApp:
             conn.commit()
             cursor.close()
             conn.close()
+            logging.info(f"Database entry complete for: {filename}")
         except Exception as e:
-            print("Database insertion error:", str(e))
+            logging.error(f"Database insertion error: {e}\n{traceback.format_exc()}")
 
+    def log_from_frontend(self):
+        try:
+            data = request.json
+            level = data.get("level", "info").lower()
+            message = data.get("message", "")
+            metadata = data.get("metadata", {})
+            log_msg = f"{message} | Metadata: {metadata}"
 
+            if hasattr(frontend_logger, level):
+                getattr(frontend_logger, level)(log_msg)
+            else:
+                frontend_logger.info(log_msg)
+
+            return jsonify({"status": "logged"}), 200
+
+        except Exception as e:
+            print("Error logging from frontend:", str(e))
+            return jsonify({"error": str(e)}), 500
     def run(self, port=5000, debug=True):
         self.app.run(port=port, debug=debug)
 

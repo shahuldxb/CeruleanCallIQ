@@ -1,6 +1,14 @@
 import React from "react";
 
-const TranscriptionResult = ({ results }) => {
+interface TranscriptionItem {
+  filename: string;
+  transcription: string;
+}
+
+interface TranscriptionResultProps {
+  results: TranscriptionItem[];
+}
+const TranscriptionResult: React.FC<TranscriptionResultProps> = ({ results }) => {
   if (!results || results.length === 0) {
     return <p>No transcriptions available.</p>;
   }

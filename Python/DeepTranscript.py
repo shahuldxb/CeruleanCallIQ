@@ -36,13 +36,6 @@ def analyze_audio_with_deepgram(audio_url):
         results = {
             "transcription": response_json.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("transcript", "")
         }
-
-            # "summary": response_json.get("results", {}).get("summary", {}).get("short", ""),
-            # "topics": response_json.get("results", {}).get("topics", {}).get("segments", []),
-            # "sentiment": response_json.get("results", {}).get("sentiments", {}).get("average", {}),
-            # "intents": response_json.get("results", {}).get("intents", []),
-            # "entities": response_json.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("entities", [])
-        
         print("REsults",results)
         return results
     else:
