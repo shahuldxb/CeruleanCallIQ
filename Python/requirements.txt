@@ -1,3 +1,12 @@
 flask
 flask-cors
 azure-storage-blob
+requests
+python-dotenv
+pyodbc
+
+
+
+
+
+
