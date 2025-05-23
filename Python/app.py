@@ -12,7 +12,7 @@ from logger import process_logs
 import requests
 import logging
 import traceback
-import json
+# Configure logging
 logging.basicConfig(
     filename='app.log',
     level=logging.INFO,
@@ -59,19 +59,6 @@ class AudioServerApp:
         self.app.route("/api/process-audio", methods=["POST"])(self.process_audio_stream)
         self.app.route("/api/log", methods=["POST"])(self.log_from_frontend)
 
-    # def serve_audio(self, filename):
-    #     try:
-    #         upload_path = os.path.join(UPLOAD_FOLDER, filename)
-    #         if os.path.exists(upload_path):
-    #             return send_from_directory(UPLOAD_FOLDER, filename)
-    #         local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
-    #         if os.path.exists(local_path):
-    #             return send_from_directory(self.LOCAL_FOLDER_PATH, filename)
-
-    #         raise FileNotFoundError(f"File not found: {filename}")
-    #     except Exception as e:
-    #         logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
-    #         return jsonify({"error": str(e)}), 404
     def serve_audio(self, filename):
         try:
             full_paths = [
