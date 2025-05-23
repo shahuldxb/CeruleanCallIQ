@@ -4,7 +4,7 @@ import os, hashlib, datetime, pyodbc
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
-from DeepTranscript import analyze_audio_with_deepgram
+from DeepTranscript import analyze_audio_with_deepgram #deepgram
 from audio import process_audio_file  # whisper
 # from aws_audio import process_audio_with_aws
 # from azure_audio import process_audio_with_azure
@@ -18,7 +18,6 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-
 # REMOVE THIS if not needed
 frontend_logger = logging.getLogger('frontendLogger')
 frontend_logger.setLevel(logging.INFO)
@@ -60,17 +59,34 @@ class AudioServerApp:
         self.app.route("/api/process-audio", methods=["POST"])(self.process_audio_stream)
         self.app.route("/api/log", methods=["POST"])(self.log_from_frontend)
 
+    # def serve_audio(self, filename):
+    #     try:
+    #         upload_path = os.path.join(UPLOAD_FOLDER, filename)
+    #         if os.path.exists(upload_path):
+    #             return send_from_directory(UPLOAD_FOLDER, filename)
+    #         local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
+    #         if os.path.exists(local_path):
+    #             return send_from_directory(self.LOCAL_FOLDER_PATH, filename)
+
+    #         raise FileNotFoundError(f"File not found: {filename}")
+    #     except Exception as e:
+    #         logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
+    #         return jsonify({"error": str(e)}), 404
     def serve_audio(self, filename):
         try:
-            upload_path = os.path.join(UPLOAD_FOLDER, filename)
-            if os.path.exists(upload_path):
-                return send_from_directory(UPLOAD_FOLDER, filename)
+            full_paths = [
+                os.path.join(self.UPLOAD_FOLDER, filename),
+                os.path.join(self.LOCAL_FOLDER_PATH or "", filename)
+            ]
 
-            local_path = os.path.join(self.LOCAL_FOLDER_PATH, filename)
-            if os.path.exists(local_path):
-                return send_from_directory(self.LOCAL_FOLDER_PATH, filename)
+            for path in full_paths:
+                logging.info(f"Looking for file at: {path}")
+                if os.path.exists(path):
+                    directory = os.path.dirname(path)
+                    return send_from_directory(directory, filename)
 
-            raise FileNotFoundError(f"File not found: {filename}")
+            raise FileNotFoundError(f"File '{filename}' not found in any expected location: {full_paths}")
+        
         except Exception as e:
             logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 404
@@ -289,8 +305,6 @@ class AudioServerApp:
         except Exception as e:
             logging.error(f"Frontend logging error: {e}\n{traceback.format_exc()}")
             return jsonify({"error": str(e)}), 500
-
-
 if __name__ == "__main__":
     app_instance = AudioServerApp()
     app_instance.run(port=5000)

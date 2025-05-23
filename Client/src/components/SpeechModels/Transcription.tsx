@@ -8,7 +8,23 @@ interface FileItem {
   isAzure: boolean;
   rawFile?: File;
 }
-
+const waitForAudioFile = async (
+  filename: string,
+  retries = 10,
+  delay = 1000
+): Promise<boolean> => {
+  const url = `http://localhost:5000/audio/${encodeURIComponent(filename)}`;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      if (res.ok) return true;
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  throw new Error(
+    `Audio file not available after ${retries} attempts: ${filename}`
+  );
+};
 const Transcription: React.FC = () => {
   const [selectOption, setSelectOption] = useState<string>("");
   const [selectModelOption, setSelectModelOption] = useState<string>("");
@@ -97,6 +113,7 @@ const Transcription: React.FC = () => {
       setPlayingIndex(index);
     }
   };
+
   useEffect(() => {
     console.log("Updated transcriptionResults:", transcriptionResults);
   }, [transcriptionResults]);
@@ -133,7 +150,19 @@ const Transcription: React.FC = () => {
           );
 
           const resultArray = response.data;
+          // if (Array.isArray(resultArray)) {
+          //   allResults.push(...resultArray);
+          // }
           if (Array.isArray(resultArray)) {
+            for (const result of resultArray) {
+              if (result.filename) {
+                try {
+                  await waitForAudioFile(result.filename);
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+            }
             allResults.push(...resultArray);
           }
 
@@ -159,10 +188,21 @@ const Transcription: React.FC = () => {
           );
 
           const resultArray = response.data;
+          // if (Array.isArray(resultArray)) {
+          //   allResults.push(...resultArray);
+          // }
           if (Array.isArray(resultArray)) {
+            for (const result of resultArray) {
+              if (result.filename) {
+                try {
+                  await waitForAudioFile(result.filename);
+                } catch (err) {
+                  console.error(err);
+                }
+              }
+            }
             allResults.push(...resultArray);
           }
-
           setOutboxFiles((prev) => [...prev, fileObj.file]);
           remainingFiles = remainingFiles.filter(
             (f) => f.file !== fileObj.file
@@ -172,14 +212,13 @@ const Transcription: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error("Error processing audio:", err);
+      console.error("error occur in processing");
       logFrontend("error", "Error processing audio", {
         error: err instanceof Error ? err.message : String(err),
         model: selectModelOption,
         source: selectOption,
         page: "transcription page",
       });
-      alert("An error occurred during processing.");
     }
     setProcessingFile(null);
   };
@@ -329,7 +368,7 @@ const Transcription: React.FC = () => {
                           </svg>
                         )}
                       </div>
-                      <audio
+                      <audio 
                         ref={(el) => (audioRefs.current[idx] = el)}
                         src={`http://localhost:5000/${
                           isAzure ? "azure-audio" : "audio"
@@ -337,6 +376,7 @@ const Transcription: React.FC = () => {
                         onEnded={() => setPlayingIndex(null)}
                         onError={() => console.error(`Error loading ${file}`)}
                       />
+
                     </li>
                   ))}
                 </ul>
