@@ -1,5 +1,6 @@
 # .gitignore
 # Virtual environment
+myenv/
 venv/
 env/
 # Log files
