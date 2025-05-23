@@ -4,4 +4,5 @@ azure-storage-blob
 requests
 python-dotenv
 pyodbc
+git+https://github.com/openai/whisper.git
 
