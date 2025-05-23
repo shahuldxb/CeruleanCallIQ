@@ -9,12 +9,14 @@ from audio import process_audio_file
 import requests
 import logging
 import traceback
+
 # Configure logging
 logging.basicConfig(
     filename='app.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
 # REMOVE THIS if not needed
 frontend_logger = logging.getLogger('frontendLogger')
 frontend_logger.setLevel(logging.INFO)
@@ -60,6 +62,8 @@ class AudioServerApp:
     #     except Exception as e:
     #         logging.error(f"Error serving file '{filename}': {e}\n{traceback.format_exc()}")
     #         return jsonify({"error": str(e)}), 404
+
+    
     def serve_audio(self, filename):
         try:
             # Check upload folder first
