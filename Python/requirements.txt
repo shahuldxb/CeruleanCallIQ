@@ -5,8 +5,3 @@ requests
 python-dotenv
 pyodbc
 
-
-
-
-
-
